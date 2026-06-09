@@ -7,14 +7,12 @@ namespace SecureVaultAPI.Services;
 public class BlobStorageService : IBlobStorageService
 {
     private readonly BlobContainerClient _container;
-    private readonly string _userId;
 
     public BlobStorageService(IKeyVaultService keyVault, IConfiguration config)
     {
         var connectionString = keyVault.GetSecretAsync("StorageConnectionString").GetAwaiter().GetResult();
         var containerName = config["Azure:StorageContainerName"] ?? "documents";
         _container = new BlobContainerClient(connectionString, containerName);
-        _userId = string.Empty;
     }
 
     public async Task<string> UploadAsync(string userId, IFormFile file)
@@ -50,8 +48,10 @@ public class BlobStorageService : IBlobStorageService
         var prefix = $"{userId}/";
 
         await foreach (var blob in _container.GetBlobsAsync(
-            traits: BlobTraits.Metadata,
-            prefix: prefix))
+     traits: BlobTraits.Metadata,
+     states: BlobStates.None,
+     prefix: prefix,
+     cancellationToken: CancellationToken.None))
         {
             results.Add(new DocumentMetadata
             {
@@ -69,7 +69,12 @@ public class BlobStorageService : IBlobStorageService
     public async Task<Stream> DownloadAsync(string userId, string documentId)
     {
         var prefix = $"{userId}/{documentId}/";
-        await foreach (var blob in _container.GetBlobsAsync(prefix: prefix))
+
+        await foreach (var blob in _container.GetBlobsAsync(
+     traits: BlobTraits.None,
+     states: BlobStates.None,
+     prefix: prefix,
+     cancellationToken: CancellationToken.None))
         {
             var blobClient = _container.GetBlobClient(blob.Name);
             var download = await blobClient.DownloadStreamingAsync();

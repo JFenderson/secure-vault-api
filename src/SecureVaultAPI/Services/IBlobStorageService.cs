@@ -1,4 +1,6 @@
-﻿namespace SecureVaultAPI.Services;
+﻿using SecureVaultAPI.Models;
+
+namespace SecureVaultAPI.Services;
 
 public interface IBlobStorageService
 {
