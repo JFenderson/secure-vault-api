@@ -1,0 +1,32 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Verify Key Vault access
+        run: |
+          az keyvault secret show \
+            --vault-name ${{ secrets.KEY_VAULT_NAME }} \
+            --name "DatabaseConnectionString" \
+            --query "value" \
+            -o tsv
+
+      - name: Logout
+        run: az logout
+        if: always()
