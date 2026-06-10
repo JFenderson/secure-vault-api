@@ -43,17 +43,24 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
         options.Events = new JwtBearerEvents
         {
-            OnAuthenticationFailed = context =>
-            {
-                Console.WriteLine($"JWT auth failed: {context.Exception.GetType().Name}: {context.Exception.Message}");
-                return Task.CompletedTask;
-            },
             OnMessageReceived = context =>
             {
-                Console.WriteLine($"Token received, length: {context.Token?.Length}, starts with: {context.Token?[..10]}");
+                var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+                Console.WriteLine($"Auth header: '{authHeader?[..Math.Min(20, authHeader.Length)]}'");
+                Console.WriteLine($"Token from context: '{context.Token}'");
+                return Task.CompletedTask;
+            },
+            OnAuthenticationFailed = context =>
+            {
+                Console.WriteLine($"JWT auth failed: {context.Exception.Message}");
+                return Task.CompletedTask;
+            },
+            OnChallenge = context =>
+            {
+                Console.WriteLine($"JWT challenge: {context.Error}, {context.ErrorDescription}");
                 return Task.CompletedTask;
             }
-    };
+        };
 
 
     });
