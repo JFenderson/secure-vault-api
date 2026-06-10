@@ -7,6 +7,9 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+Microsoft.IdentityModel.Logging.IdentityModelEventSource.ShowPII = true;
+
+
 builder.Services.AddControllers();
 builder.Services.AddSingleton<IKeyVaultService, KeyVaultService>();
 builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
@@ -43,12 +46,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 Console.WriteLine($"JWT auth failed: {context.Exception.GetType().Name}: {context.Exception.Message}");
                 return Task.CompletedTask;
             },
-            OnTokenValidated = context =>
+            OnMessageReceived = context =>
             {
-                Console.WriteLine($"JWT token validated for: {context.Principal?.Identity?.Name}");
+                Console.WriteLine($"Token received, length: {context.Token?.Length}, starts with: {context.Token?[..10]}");
                 return Task.CompletedTask;
             }
-        };
+    };
 
 
     });
