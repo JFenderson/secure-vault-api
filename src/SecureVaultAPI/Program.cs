@@ -47,7 +47,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             {
                 var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
                 Console.WriteLine($"Auth header: '{authHeader?[..Math.Min(20, authHeader.Length)]}'");
-                Console.WriteLine($"Token from context: '{context.Token}'");
+
+                if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer "))
+                {
+                    context.Token = authHeader["Bearer ".Length..].Trim();
+                }
+
+                Console.WriteLine($"Token from context: '{context.Token?[..Math.Min(10, context.Token?.Length ?? 0)]}'");
                 return Task.CompletedTask;
             },
             OnAuthenticationFailed = context =>
