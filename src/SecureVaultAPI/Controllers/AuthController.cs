@@ -24,25 +24,27 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    public IActionResult Login([FromBody] LoginRequest request)
     {
-        // Hardcoded demo user - Phase 3 replaces this with real user store
         if (request.Username != "demo" || request.Password != "Password123!")
         {
             _logger.LogWarning("Failed login attempt for username: {Username}", request.Username);
             return Unauthorized(new { message = "Invalid credentials" });
         }
 
-        var jwtSecret = await _keyVault.GetSecretAsync("JwtSecret");
+        // Read from config - same value used to configure JWT validation at startup
+        var jwtSecret = _config["Jwt:Secret"]
+            ?? throw new InvalidOperationException("Jwt:Secret not configured");
+
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, request.Username),
-            new Claim(ClaimTypes.Name, request.Username),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-        };
+        new Claim(ClaimTypes.NameIdentifier, request.Username),
+        new Claim(ClaimTypes.Name, request.Username),
+        new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+    };
 
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],

@@ -21,6 +21,8 @@ var vaultUri = builder.Configuration["KeyVault:VaultUri"]
 var secretClient = new SecretClient(new Uri(vaultUri), new DefaultAzureCredential());
 var jwtSecret = secretClient.GetSecret("JwtSecret").Value.Value;
 
+builder.Configuration["Jwt:Secret"] = jwtSecret;
+
 Console.WriteLine($"JWT secret loaded, length: {jwtSecret.Length}, first 4 chars: {jwtSecret[..4]}");
 
 
