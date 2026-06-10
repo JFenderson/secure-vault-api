@@ -18,6 +18,9 @@ var vaultUri = builder.Configuration["KeyVault:VaultUri"]
 var secretClient = new SecretClient(new Uri(vaultUri), new DefaultAzureCredential());
 var jwtSecret = secretClient.GetSecret("JwtSecret").Value.Value;
 
+Console.WriteLine($"JWT secret loaded, length: {jwtSecret.Length}, first 4 chars: {jwtSecret[..4]}");
+
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -32,15 +35,33 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(jwtSecret))
         };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnAuthenticationFailed = context =>
+            {
+                Console.WriteLine($"JWT auth failed: {context.Exception.GetType().Name}: {context.Exception.Message}");
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                Console.WriteLine($"JWT token validated for: {context.Principal?.Identity?.Name}");
+                return Task.CompletedTask;
+            }
+        };
+
+
     });
 
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
+
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
 
 app.Run();
