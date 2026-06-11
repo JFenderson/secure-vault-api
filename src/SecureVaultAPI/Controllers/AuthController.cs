@@ -32,9 +32,8 @@ public class AuthController : ControllerBase
             return Unauthorized(new { message = "Invalid credentials" });
         }
 
-        // Read from config - same value used to configure JWT validation at startup
-        var jwtSecret = _config["Jwt:Secret"]
-            ?? throw new InvalidOperationException("Jwt:Secret not configured");
+        var jwtSecret = JwtSecretHolder.Secret;
+        Console.WriteLine($"AuthController using secret length: {jwtSecret.Length}, first 4: {jwtSecret[..4]}");
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

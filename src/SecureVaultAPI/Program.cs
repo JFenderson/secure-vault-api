@@ -2,6 +2,7 @@ using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using SecureVaultAPI;
 using SecureVaultAPI.Services;
 using System.Text;
 
@@ -21,9 +22,13 @@ var vaultUri = builder.Configuration["KeyVault:VaultUri"]
 var secretClient = new SecretClient(new Uri(vaultUri), new DefaultAzureCredential());
 var jwtSecret = secretClient.GetSecret("JwtSecret").Value.Value;
 
-builder.Configuration["Jwt:Secret"] = jwtSecret;
+JwtSecretHolder.Secret = jwtSecret;
 
+//builder.Configuration["Jwt:Secret"] = jwtSecret;
+
+//Console.WriteLine($"JWT secret loaded, length: {jwtSecret.Length}, first 4 chars: {jwtSecret[..4]}");
 Console.WriteLine($"JWT secret loaded, length: {jwtSecret.Length}, first 4 chars: {jwtSecret[..4]}");
+Console.WriteLine($"Holder secret length: {JwtSecretHolder.Secret.Length}");
 
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -37,8 +42,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
+            //IssuerSigningKey = new SymmetricSecurityKey(
+            //    Encoding.UTF8.GetBytes(jwtSecret))
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwtSecret))
+    Encoding.UTF8.GetBytes(JwtSecretHolder.Secret))
         };
 
         options.Events = new JwtBearerEvents
