@@ -1,13 +1,14 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using SecureVaultAPI.Services;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text;
+using Microsoft.IdentityModel.Tokens;
 
 namespace SecureVaultAPI.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
 public class DocumentsController : ControllerBase
 {
     private readonly IBlobStorageService _storage;
@@ -19,9 +20,49 @@ public class DocumentsController : ControllerBase
         _logger = logger;
     }
 
+    private ClaimsPrincipal? ValidateToken(string? authHeader)
+    {
+        if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
+            return null;
+
+        var token = authHeader.Substring(7).Trim();
+        var secret = JwtSecretHolder.Secret;
+
+        Console.WriteLine($"Manual validate - token length: {token.Length}, secret length: {secret.Length}");
+
+        try
+        {
+            var handler = new JwtSecurityTokenHandler();
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+
+            var principal = handler.ValidateToken(token, new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = key,
+                ValidateIssuer = true,
+                ValidIssuer = "SecureVaultAPI",
+                ValidateAudience = true,
+                ValidAudience = "SecureVaultAPIUsers",
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero
+            }, out _);
+
+            Console.WriteLine($"Manual validate - success, user: {principal.Identity?.Name}");
+            return principal;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Manual validate failed: {ex.GetType().Name}: {ex.Message}");
+            return null;
+        }
+    }
+
     [HttpPost("upload")]
     public async Task<IActionResult> Upload(IFormFile file)
     {
+        var principal = ValidateToken(Request.Headers["Authorization"].FirstOrDefault());
+        if (principal == null) return Unauthorized();
+
         if (file == null || file.Length == 0)
             return BadRequest(new { message = "No file provided" });
 
@@ -32,20 +73,21 @@ public class DocumentsController : ControllerBase
         if (!allowedTypes.Contains(file.ContentType))
             return BadRequest(new { message = "File type not allowed" });
 
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new InvalidOperationException("User ID not found in token");
 
         _logger.LogInformation("Upload initiated by {UserId} for file {FileName}", userId, file.FileName);
-
         var documentId = await _storage.UploadAsync(userId, file);
-
         return Ok(new { documentId, message = "Upload successful" });
     }
 
     [HttpGet]
     public async Task<IActionResult> List()
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+        var principal = ValidateToken(Request.Headers["Authorization"].FirstOrDefault());
+        if (principal == null) return Unauthorized();
+
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new InvalidOperationException("User ID not found in token");
 
         var documents = await _storage.ListAsync(userId);
@@ -55,7 +97,10 @@ public class DocumentsController : ControllerBase
     [HttpGet("{documentId}")]
     public async Task<IActionResult> Download(string documentId)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
+        var principal = ValidateToken(Request.Headers["Authorization"].FirstOrDefault());
+        if (principal == null) return Unauthorized();
+
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new InvalidOperationException("User ID not found in token");
 
         try
